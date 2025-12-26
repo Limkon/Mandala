@@ -106,6 +106,11 @@ void LoadSettings() {
     int upMode = GetPrivateProfileIntW(L"Subscriptions", L"UpdateMode", 0, g_iniFilePath);
     int upInterval = GetPrivateProfileIntW(L"Subscriptions", L"UpdateInterval", 24, g_iniFilePath);
 
+    // [Fix] 读取上一次更新的时间戳
+    wchar_t wLastTime[32] = {0};
+    GetPrivateProfileStringW(L"Subscriptions", L"LastUpdateTime", L"0", wLastTime, 32, g_iniFilePath);
+    long long lastUpdateTime = _wtoi64(wLastTime);
+
     EnterCriticalSection(&g_configLock);
 
     g_hotkeyModifiers = modifiers;
@@ -128,9 +133,9 @@ void LoadSettings() {
 
     g_uaPlatformIndex = uaIdx;
     
-    // 赋值新增变量
     g_subUpdateMode = upMode;
     g_subUpdateInterval = upInterval;
+    g_lastSubUpdateTime = lastUpdateTime;
 
     wchar_t wUABuf[512] = {0}; 
     GetPrivateProfileStringW(L"Settings", L"UserAgent", L"", wUABuf, 512, g_iniFilePath);
@@ -156,21 +161,21 @@ void LoadSettings() {
 void SaveSettings() {
     EnterCriticalSection(&g_configLock);
 
-    wchar_t buffer[16];
-    _snwprintf(buffer, 16, L"%u", g_hotkeyModifiers); WritePrivateProfileStringW(L"Settings", L"Modifiers", buffer, g_iniFilePath);
-    _snwprintf(buffer, 16, L"%u", g_hotkeyVk); WritePrivateProfileStringW(L"Settings", L"VK", buffer, g_iniFilePath);
-    _snwprintf(buffer, 16, L"%d", g_localPort); WritePrivateProfileStringW(L"Settings", L"LocalPort", buffer, g_iniFilePath);
-    _snwprintf(buffer, 16, L"%d", g_hideTrayStart); WritePrivateProfileStringW(L"Settings", L"HideTray", buffer, g_iniFilePath);
-    _snwprintf(buffer, 16, L"%d", g_enableChromeCiphers); WritePrivateProfileStringW(L"Settings", L"ChromeCiphers", buffer, g_iniFilePath);
-    _snwprintf(buffer, 16, L"%d", g_enableALPN); WritePrivateProfileStringW(L"Settings", L"EnableALPN", buffer, g_iniFilePath);
-    _snwprintf(buffer, 16, L"%d", g_enableFragment); WritePrivateProfileStringW(L"Settings", L"EnableFragment", buffer, g_iniFilePath);
-    _snwprintf(buffer, 16, L"%d", g_fragSizeMin); WritePrivateProfileStringW(L"Settings", L"FragMin", buffer, g_iniFilePath);
-    _snwprintf(buffer, 16, L"%d", g_fragSizeMax); WritePrivateProfileStringW(L"Settings", L"FragMax", buffer, g_iniFilePath);
-    _snwprintf(buffer, 16, L"%d", g_fragDelayMs); WritePrivateProfileStringW(L"Settings", L"FragDelay", buffer, g_iniFilePath);
-    _snwprintf(buffer, 16, L"%d", g_enablePadding); WritePrivateProfileStringW(L"Settings", L"EnablePadding", buffer, g_iniFilePath);
-    _snwprintf(buffer, 16, L"%d", g_padSizeMin); WritePrivateProfileStringW(L"Settings", L"PadMin", buffer, g_iniFilePath);
-    _snwprintf(buffer, 16, L"%d", g_padSizeMax); WritePrivateProfileStringW(L"Settings", L"PadMax", buffer, g_iniFilePath);
-    _snwprintf(buffer, 16, L"%d", g_uaPlatformIndex); WritePrivateProfileStringW(L"Settings", L"UAPlatform", buffer, g_iniFilePath);
+    wchar_t buffer[32];
+    _snwprintf(buffer, 32, L"%u", g_hotkeyModifiers); WritePrivateProfileStringW(L"Settings", L"Modifiers", buffer, g_iniFilePath);
+    _snwprintf(buffer, 32, L"%u", g_hotkeyVk); WritePrivateProfileStringW(L"Settings", L"VK", buffer, g_iniFilePath);
+    _snwprintf(buffer, 32, L"%d", g_localPort); WritePrivateProfileStringW(L"Settings", L"LocalPort", buffer, g_iniFilePath);
+    _snwprintf(buffer, 32, L"%d", g_hideTrayStart); WritePrivateProfileStringW(L"Settings", L"HideTray", buffer, g_iniFilePath);
+    _snwprintf(buffer, 32, L"%d", g_enableChromeCiphers); WritePrivateProfileStringW(L"Settings", L"ChromeCiphers", buffer, g_iniFilePath);
+    _snwprintf(buffer, 32, L"%d", g_enableALPN); WritePrivateProfileStringW(L"Settings", L"EnableALPN", buffer, g_iniFilePath);
+    _snwprintf(buffer, 32, L"%d", g_enableFragment); WritePrivateProfileStringW(L"Settings", L"EnableFragment", buffer, g_iniFilePath);
+    _snwprintf(buffer, 32, L"%d", g_fragSizeMin); WritePrivateProfileStringW(L"Settings", L"FragMin", buffer, g_iniFilePath);
+    _snwprintf(buffer, 32, L"%d", g_fragSizeMax); WritePrivateProfileStringW(L"Settings", L"FragMax", buffer, g_iniFilePath);
+    _snwprintf(buffer, 32, L"%d", g_fragDelayMs); WritePrivateProfileStringW(L"Settings", L"FragDelay", buffer, g_iniFilePath);
+    _snwprintf(buffer, 32, L"%d", g_enablePadding); WritePrivateProfileStringW(L"Settings", L"EnablePadding", buffer, g_iniFilePath);
+    _snwprintf(buffer, 32, L"%d", g_padSizeMin); WritePrivateProfileStringW(L"Settings", L"PadMin", buffer, g_iniFilePath);
+    _snwprintf(buffer, 32, L"%d", g_padSizeMax); WritePrivateProfileStringW(L"Settings", L"PadMax", buffer, g_iniFilePath);
+    _snwprintf(buffer, 32, L"%d", g_uaPlatformIndex); WritePrivateProfileStringW(L"Settings", L"UAPlatform", buffer, g_iniFilePath);
     
     wchar_t wUABuf[512] = {0}; 
     MultiByteToWideChar(CP_UTF8, 0, g_userAgentStr, -1, wUABuf, 512);
@@ -180,11 +185,14 @@ void SaveSettings() {
 
     WritePrivateProfileStringW(L"Subscriptions", NULL, NULL, g_iniFilePath);
     
-    // 新增：保存订阅更新设置
-    _snwprintf(buffer, 16, L"%d", g_subUpdateMode); WritePrivateProfileStringW(L"Subscriptions", L"UpdateMode", buffer, g_iniFilePath);
-    _snwprintf(buffer, 16, L"%d", g_subUpdateInterval); WritePrivateProfileStringW(L"Subscriptions", L"UpdateInterval", buffer, g_iniFilePath);
+    _snwprintf(buffer, 32, L"%d", g_subUpdateMode); WritePrivateProfileStringW(L"Subscriptions", L"UpdateMode", buffer, g_iniFilePath);
+    _snwprintf(buffer, 32, L"%d", g_subUpdateInterval); WritePrivateProfileStringW(L"Subscriptions", L"UpdateInterval", buffer, g_iniFilePath);
 
-    _snwprintf(buffer, 16, L"%d", g_subCount); WritePrivateProfileStringW(L"Subscriptions", L"Count", buffer, g_iniFilePath);
+    // [Fix] 保存上一次更新的时间戳
+    _snwprintf(buffer, 32, L"%lld", g_lastSubUpdateTime); 
+    WritePrivateProfileStringW(L"Subscriptions", L"LastUpdateTime", buffer, g_iniFilePath);
+
+    _snwprintf(buffer, 32, L"%d", g_subCount); WritePrivateProfileStringW(L"Subscriptions", L"Count", buffer, g_iniFilePath);
     for (int i = 0; i < g_subCount; i++) {
         wchar_t wKeyEn[32], wKeyUrl[32], wUrl[512], wVal[2];
         _snwprintf(wKeyEn, 32, L"Sub%d_Enabled", i); 
@@ -326,7 +334,6 @@ void ParseNodeConfigToGlobal(cJSON *node) {
         g_proxyConfig.host, g_proxyConfig.port, g_proxyConfig.type, g_proxyConfig.sni);
 }
 
-// [核心修复] 实现节点热切换，移除冗余的 Stop/Start 逻辑
 void SwitchNode(const wchar_t* tag) {
     EnterCriticalSection(&g_configLock);
     wcsncpy(currentNode, tag, 63);
@@ -347,13 +354,9 @@ void SwitchNode(const wchar_t* tag) {
     }
     
     if (targetNode) {
-        /* [修复点] 移除 StopProxyCore()。
-           监听线程 (server_thread) 会在每个新连接进入时拷贝全局配置。
-           直接更新全局配置即可实现“热更新”，无需重启监听套接字。 */
-        
-        ParseNodeConfigToGlobal(targetNode); // 原子更新全局变量
-        StartProxyCore(); // 确保代理处于运行状态
-        SaveSettings();   // 保存持久化设置
+        ParseNodeConfigToGlobal(targetNode); 
+        StartProxyCore(); 
+        SaveSettings();   
         
         wchar_t tip[128]; 
         _snwprintf(tip, 128, L"已切换: %s", tag);
@@ -485,14 +488,12 @@ int UpdateAllSubscriptions(BOOL forceMsg) {
     char* rawData[MAX_SUBS] = {0}; int downloadSuccess = 0;
     
     char subUrls[MAX_SUBS][512];
-    int subIndices[MAX_SUBS];
     int count = 0;
 
     EnterCriticalSection(&g_configLock);
     for (int i = 0; i < g_subCount; i++) {
         if (g_subs[i].enabled && strlen(g_subs[i].url) > 4) {
             strncpy(subUrls[count], g_subs[i].url, 512);
-            subIndices[count] = i;
             count++;
         }
     }
@@ -520,6 +521,14 @@ int UpdateAllSubscriptions(BOOL forceMsg) {
             free(rawData[i]); 
         }
     }
+    
+    // [Fix] 更新成功后记录当前时间戳
+    if (totalNewNodes >= 0) {
+        EnterCriticalSection(&g_configLock);
+        g_lastSubUpdateTime = (long long)time(NULL);
+        LeaveCriticalSection(&g_configLock);
+    }
+
     log_msg("[Sub] Total nodes parsed: %d. Saving config...", totalNewNodes);
     char* out = cJSON_Print(root); WriteBufferToFile(CONFIG_FILE, out); free(out); cJSON_Delete(root);
     ParseTags(); 
@@ -686,7 +695,7 @@ cJSON* ParseVmess(const char* link) {
     cJSON* sni = cJSON_GetObjectItem(vmessJson, "sni");
     cJSON_AddStringToObject(outbound, "tag", cJSON_IsString(ps) ? ps->valuestring : "VMess");
     cJSON_AddStringToObject(outbound, "server", cJSON_IsString(add) ? add->valuestring : "");
-    cJSON_AddNumberToObject(outbound, "server_port", cJSON_IsNumber(port)?port->valueint:atoi(port->valuestring));
+    cJSON_AddNumberToObject(outbound, "server_port", cJSON_IsString(port) ? atoi(port->valuestring) : (cJSON_IsNumber(port) ? port->valueint : 443));
     cJSON_AddStringToObject(outbound, "uuid", cJSON_IsString(id) ? id->valuestring : "");
     if (cJSON_IsString(net) && strcmp(net->valuestring, "ws") == 0) {
         cJSON* t = cJSON_CreateObject(); cJSON_AddStringToObject(t, "type", "ws");
