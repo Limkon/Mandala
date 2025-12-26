@@ -581,13 +581,39 @@ LRESULT CALLBACK SubWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
         case WM_UPDATE_FINISH: { 
             int count = (int)wParam;
+            
+            // 恢复“立即更新”按钮状态
             EnableWindow(GetDlgItem(hWnd, ID_SUB_UPD_BTN), TRUE);
             SetWindowTextW(hWnd, L"订阅设置");
-            wchar_t msgBuf[128]; 
-            swprintf_s(msgBuf, 128, L"更新完成，共获取 %d 个节点。", count);
-            MessageBoxW(hWnd, msgBuf, L"结果", MB_OK);
-            HWND hMgr = FindWindowW(L"NodeMgr", NULL);
-            if (hMgr) SendMessage(hMgr, WM_REFRESH_NODELIST, 0, 0);
+            
+            // 准备提示框内容
+            wchar_t msgBuf[512]; 
+            UINT iconType = MB_ICONINFORMATION;
+            wchar_t title[64] = L"更新结果";
+
+            if (count > 0) {
+                // 成功获取到节点
+                swprintf_s(msgBuf, 512, L"更新成功！\n\n本次共获取到 %d 个节点。\n节点列表已自动刷新。", count);
+            } else if (count == 0) {
+                // 请求成功但无内容
+                swprintf_s(msgBuf, 512, L"更新完成，但未发现任何节点。\n\n可能的原因：\n1. 订阅链接中没有包含有效的节点信息。\n2. 订阅源暂时为空。");
+                iconType = MB_ICONWARNING;
+            } else {
+                // count < 0，发生错误 (如 -1)
+                swprintf_s(msgBuf, 512, L"更新失败！\n\n无法从订阅源下载数据。\n\n请检查：\n1. 网络连接是否正常。\n2. 订阅地址是否正确。\n3. 是否需要关闭系统代理后再试。");
+                iconType = MB_ICONERROR;
+                wcscpy(title, L"更新错误");
+            }
+
+            MessageBoxW(hWnd, msgBuf, title, MB_OK | iconType);
+            
+            // 只有在成功获取或虽然为0但非网络错误时，才通知主窗口刷新
+            if (count >= 0) {
+                HWND hMgr = FindWindowW(L"NodeMgr", NULL);
+                if (hMgr && IsWindow(hMgr)) {
+                    SendMessage(hMgr, WM_REFRESH_NODELIST, 0, 0);
+                }
+            }
             break;
         }
         case WM_CLOSE: DestroyWindow(hWnd); break;
