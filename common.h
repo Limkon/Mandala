@@ -164,6 +164,9 @@ extern const char* UA_TEMPLATES[];
 
 extern BOOL g_enableLog;
 
+// 新增：订阅上次更新的时间戳 (Unix Timestamp)
+extern long long g_lastSubUpdateTime;
+
 extern CRITICAL_SECTION g_configLock; 
 void InitGlobalLocks();
 void DeleteGlobalLocks();
