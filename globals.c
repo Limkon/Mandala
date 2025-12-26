@@ -79,3 +79,6 @@ const char* UA_TEMPLATES[] = {
 
 // 日志开关
 BOOL g_enableLog = FALSE;
+
+// 新增：订阅上次更新的时间戳 (初始化为0)
+long long g_lastSubUpdateTime = 0;
