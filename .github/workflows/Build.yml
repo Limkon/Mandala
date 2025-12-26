@@ -1,4 +1,4 @@
-name: X Windows Manual Build
+name: Windows Manual Build
 
 on:
   workflow_dispatch:
